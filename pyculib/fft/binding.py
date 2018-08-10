@@ -1,6 +1,6 @@
 from __future__ import absolute_import
 import numpy as np
-from ctypes import c_void_p, c_int, c_int64, c_size_t, c_longlong, POINTER, byref
+from ctypes import c_void_p, c_int, c_int64, c_size_t, c_long, c_longlong, POINTER, byref
 from numba import cuda
 
 from numba.cuda.cudadrv.drvapi import cu_stream
@@ -134,16 +134,16 @@ class libcufft(Lib):
     cufftMakePlanMany = ctype_function(cufftResult,
                                  cufftHandle,  # plan
                                  c_int,  # rank
-                                 POINTER(c_int),  # n
-                                 POINTER(c_int),  # inembed
+                                 c_void_p, #POINTER(c_int) n
+                                 c_void_p, #POINTER(c_int) inembed
                                  c_int,  # inembed
                                  c_int,  # idist
-                                 POINTER(c_int),  # onembed
+                                 c_void_p, #POINTER(c_int) onembed
                                  c_int,  # ostride
                                  c_int,  # odist
                                  cufftType,  # type
                                  c_int, # batch
-                                 POINTER(c_size_t), # workSize
+                                 c_void_p, #POINTER(c_size_t) workSize
     )
    
     #cufftResult CUFFTAPI cufftMakePlanMany64(cufftHandle plan,
@@ -160,16 +160,16 @@ class libcufft(Lib):
     cufftMakePlanMany64 = ctype_function(cufftResult,
                                  cufftHandle,  # plan
                                  c_int,  # rank
-                                 POINTER(c_longlong),  # n
-                                 POINTER(c_longlong),  # inembed
+                                 c_void_p, #POINTER(c_longlong) n
+                                 c_void_p, #POINTER(c_longlong) inembed
                                  c_longlong,  # inembed
                                  c_longlong,  # idist
-                                 POINTER(c_longlong),  # onembed
+                                 c_void_p, #POINTER(c_longlong) onembed
                                  c_longlong,  # ostride
                                  c_longlong,  # odist
                                  cufftType,  # type
                                  c_longlong, # batch
-                                 POINTER(c_size_t), # orkSize
+                                 c_void_p, #POINTER(c_size_t) workSize
     )
 
     cufftPlanMany = ctype_function(cufftResult,
@@ -248,7 +248,7 @@ class libcufft(Lib):
     cufftXtSetGPUs = ctype_function(cufftResult,
                                                cufftHandle,  # plan,
                                                c_int,  # nGPUs
-                                               POINTER(c_int) #whichGPUs)
+                                               c_void_p #POINTER(int) whichGPUs)
     )
     
     #cufftResult CUFFTAPI cufftXtMalloc(cufftHandle plan,
@@ -256,7 +256,7 @@ class libcufft(Lib):
     #                                   cufftXtSubFormat format);
     cufftXtMalloc = ctype_function(cufftResult,
                                                cufftHandle,  # plan,
-                                               POINTER(c_void_p),  # descriptor
+                                               c_void_p, #POINTER(c_void_p) descriptor
                                                cufftXtSubFormat #format
     )
     
@@ -273,7 +273,7 @@ class libcufft(Lib):
    
     #cufftResult CUFFTAPI cufftXtFree(cudaLibXtDesc *descriptor);
     cufftXtFree = ctype_function(cufftResult,
-                                               c_void_p  # POINTER(descriptor)
+                                  c_void_p  # POINTER(descriptor)
     )                                           
     
     #cufftResult CUFFTAPI cufftXtSetWorkArea(cufftHandle plan, void **workArea);
@@ -356,17 +356,17 @@ class libcufft(Lib):
     cufftXtMakePlanMany = ctype_function(cufftResult,
                                  cufftHandle,  # plan
                                  c_int,  # rank
-                                 POINTER(c_longlong),  # n
-                                 POINTER(c_longlong),  # inembed
+                                 c_void_p, #POINTER(c_longlong) n
+                                 c_void_p, #POINTER(c_longlong) inembed
                                  c_longlong,  # inembed
                                  c_longlong,  # idist
                                  cudaDataType, # inputtype
-                                 POINTER(c_longlong),  # onembed
+                                 c_void_p, #POINTER(c_longlong) onembed
                                  c_longlong,  # ostride
                                  c_longlong,  # odist
                                  cudaDataType, # outputtype
                                  c_longlong, # batch
-                                 POINTER(c_size_t), # workSize
+                                 c_void_p, #POINTER(c_size_t) workSize
                                  cudaDataType, # executiontype
     )
 
@@ -388,17 +388,17 @@ class libcufft(Lib):
     cufftXtGetSizeMany = ctype_function(cufftResult,
                                  cufftHandle,  # plan
                                  c_int,  # rank
-                                 POINTER(c_longlong),  # n
-                                 POINTER(c_longlong),  # inembed
+                                 c_void_p, #POINTER(c_longlong) n
+                                 c_void_p, #POINTER(c_longlong) inembed
                                  c_longlong,  # inembed
                                  c_longlong,  # idist
                                  cudaDataType, # inputtype
-                                 POINTER(c_longlong),  # onembed
+                                 c_void_p, #POINTER(c_longlong) onembed
                                  c_longlong,  # ostride
                                  c_longlong,  # odist
                                  cudaDataType, # outputtype
                                  c_longlong, # batch
-                                 POINTER(c_size_t), # workSize
+                                 c_void_p, #POINTER(c_size_t) workSize
                                  cudaDataType, # executiontype
     )
 
@@ -428,7 +428,7 @@ class libcufft(Lib):
     #cufftXtSetWorkAreaPolicy = ctype_function(cufftResult,
     #                             cufftHandle,  # plan
     #                             cufftXtWorkAreaPolicy,  # policy
-    #                             POINTER(c_size_t), # workSize
+    #                             c_void_p, #POINTER(c_size_t) workSize
     #)
 
 
@@ -443,31 +443,33 @@ cufft_dtype_to_name = {
 
 class PlanDataHelper(finalizer.OwnerMixin) :
     def __init__(self):
-       self._d_data = c_int(0)
+       self._d_data = c_void_p(0)
        self._ngpu = 1
     
     def __del__(self):
       if self._ngpu > 1 :
-        if self._d_data != 0 :
+       # if self._d_data != c_void_p(0) :
+           print('\nPlanDataHelper.cufftXtFree API')
            self._api.cufftXtFree(self._d_data)
-           self._d_data = 0
+           self._d_data = c_void_p(0)
 
           
     @classmethod
     def to_device(cls, plan, data, stream=None):
+        "copy host memory to device"
         inst = object.__new__(cls)
+        inst._plan = plan
         inst._ngpu = plan._ngpu
         inst._api = libcufft()
-        "copy host memory to device"
         if plan._ngpu <= 1:
           inst._d_data = cuda.to_device(data, stream)
         else:
-          d_data = c_int()
+          inst._d_data = c_void_p(0)
           if stream != None : 
               inst._api.cufftSetStream(plan._handle, stream.handle)
-          inst._api.cufftXtMalloc(plan._handle, byref(d_data), CUFFT_XT_FORMAT_INPLACE)
-          inst._api.cufftXtMemcpy(plan._handle, d_data, data, CUFFT_COPY_HOST_TO_DEVICE)
-          inst._d_data = d_data
+          
+          inst._api.cufftXtMalloc(plan._handle, byref(inst._d_data), CUFFT_XT_FORMAT_INPLACE)
+          inst._api.cufftXtMemcpy(plan._handle, inst._d_data, data.ctypes.data, CUFFT_COPY_HOST_TO_DEVICE)
 
         return inst; 
 
@@ -476,31 +478,33 @@ class PlanDataHelper(finalizer.OwnerMixin) :
         if self._ngpu <= 1 :
           self._d_data.copy_to_host(data)
         else :
-          self._api.cufftXtMemcpy(plan, data, self._d_data, CUFFT_COPY_DEVICE_TO_HOST) 
+          print('\n[start] copy_to_host.cufftXtMemcpy Xt API ')
+          self._api.cufftXtMemcpy(self._plan._handle, data.ctypes.data, self._d_data,
+                 CUFFT_COPY_DEVICE_TO_HOST) 
+          print('\n[End] copy_to_host.cufftXtMemcpy Xt API ')
 
 class Plan(finalizer.OwnerMixin):
     @classmethod
-    def one(cls, dtype, nx, ngpu=1):
+    def one(cls, dtype, nx):
         "cufftPlan1d"
         inst = object.__new__(cls)
         inst._api = libcufft()
         inst._handle = cufftHandle()
-        inst._ngpu = ngpu
+        inst._ngpu = 1
         
         BATCH = 1  # deprecated args to cufftPlan1d
-        inst._api.cufftPlan1d(byref(inst._handle), int(nx), int(dtype),
-                              BATCH)
+        inst._api.cufftPlan1d(byref(inst._handle), int(nx), int(dtype), BATCH)
         inst.dtype = dtype
         inst._finalizer_track((inst._handle, inst._api))
         return inst
 
     @classmethod
-    def two(cls, dtype, nx, ny, ngpu=1):
+    def two(cls, dtype, nx, ny):
         "cufftPlan2d"
         inst = object.__new__(cls)
         inst._api = libcufft()
         inst._handle = cufftHandle()
-        inst._ngpu = ngpu
+        inst._ngpu = 1
 
         inst._api.cufftPlan2d(byref(inst._handle), int(nx), int(ny),
                               int(dtype))
@@ -509,15 +513,15 @@ class Plan(finalizer.OwnerMixin):
         return inst
 
     @classmethod
-    def three(cls, dtype, nx, ny, nz, ngpu=1):
+    def three(cls, dtype, nx, ny, nz):
         "cufftPlan3d"
         inst = object.__new__(cls)
         inst._api = libcufft()
         inst._handle = cufftHandle()
-        inst._ngpu = ngpu
+        inst._ngpu = 1
 
         inst._api.cufftPlan3d(byref(inst._handle), int(nx), int(ny),
-                              int(nz), int(dtype))
+                          int(nz), int(dtype))
         inst.dtype = dtype
         inst._finalizer_track((inst._handle, inst._api))
         return inst
@@ -530,29 +534,40 @@ class Plan(finalizer.OwnerMixin):
         inst._handle = cufftHandle()
         inst._ngpu = ngpu
 
-        c_shape = np.asarray(shape, dtype=np.int32)
         if ngpu <= 1 :
+            c_shape_1 = np.asarray(shape, dtype=np.int32)
             inst._api.cufftPlanMany(byref(inst._handle),
                                 len(shape),
-                                c_shape.ctypes.data,
+                                c_shape_1.ctypes.data,
                                 None, 1, 0,
                                 None, 1, 0,
                                 int(dtype), int(batch))
         else :
-            workSize = c_size_t()
-            size=c_longlong(0)
+            c_shape = np.asarray(shape, dtype=np.long)
+            
+            workSize = []
+            for i in range(ngpu) :
+                workSize.append(0)
+            c_workSize = np.asarray(workSize, dtype=np.int64)
+
+            size=np.int64(1)
             for element in c_shape:
-                size*=element
+                size=size*element
+
+            gpuid_list = []
+            for i in range (ngpu):
+                gpuid_list.append(i)  
+            gpuids = np.asarray(gpuid_list, dtype=np.int32)
                 
             inst._api.cufftCreate(byref(inst._handle) )
-            inst._api.cufftXtSetGPUs(inst._handle, ngpu, gpuid) 
+            inst._api.cufftXtSetGPUs(inst._handle, ngpu, gpuids.ctypes.data) 
             inst._api.cufftMakePlanMany64(inst._handle,
                                 len(shape),
                                 c_shape.ctypes.data,
                                 None, 1, size,
                                 None, 1, size,
-                                int(dtype), int(batch), byref(workSize))
-
+                                int(dtype), int(batch), c_workSize.ctypes.data)
+                                           
         inst.shape = shape
         inst.dtype = dtype
         inst.batch = batch
@@ -592,15 +607,19 @@ class Plan(finalizer.OwnerMixin):
         postfix = cufft_dtype_to_name[self.dtype]
         if self._ngpu <= 1 :
           meth = getattr(self._api, 'cufftExec' + postfix)
-        else :
-          meth = getattr(self._api, 'cufftXtExecDescriptor' + postfix)
+          if isinstance(idata,PlanDataHelper) :
+              return meth(self._handle, device_pointer(idata._d_data), device_pointer(odata._d_data), 
+                        int(dir))
+          else :      
+              return meth(self._handle, device_pointer(idata), device_pointer(odata), 
+                        int(dir))
+                        
+        meth = getattr(self._api, 'cufftXtExecDescriptor' + postfix)
+        if postfix == 'C2C' or postfix == 'Z2Z':
+            return meth(self._handle, idata._d_data, odata._d_data, int(dir))
         
-        if hasattr(idata,"_d_data") :  
-          return meth(self._handle, device_pointer(idata._d_data),
-                    device_pointer(odata._d_data), int(dir))
+        return meth(self._handle, idata._d_data, odata._d_data)
 
-        return meth(self._handle, device_pointer(idata),
-                    device_pointer(odata), int(dir))
 
     def forward(self, idata, odata):
         return self.exe(idata, odata, dir=CUFFT_FORWARD)

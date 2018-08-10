@@ -55,6 +55,7 @@ class TestCuFFTPlan(CUDATestCase):
 
 
     def test_against_fft_1d(self):
+     
         from pyculib.fft.binding import Plan, CUFFT_R2C
         N = 128
         x = np.asarray(np.arange(N), dtype=np.float32)
@@ -65,10 +66,10 @@ class TestCuFFTPlan(CUDATestCase):
         d_xf_gpu = plan.to_device(xf_gpu)
         plan.forward(d_x_gpu, d_xf_gpu)
         d_xf_gpu.copy_to_host(xf_gpu)
-        self.assertTrue( np.allclose(xf[0:N//2+1], xf_gpu,
-                                      atol=1e-6) )
+        self.assertTrue( np.allclose(xf[0:N//2+1], xf_gpu, atol=1e-6) )
 
     def test_against_fft_2d(self):
+ 
         from pyculib.fft.binding import Plan, CUFFT_R2C
         rank = 2
         rowsize = 128
@@ -84,6 +85,7 @@ class TestCuFFTPlan(CUDATestCase):
         self.assertTrue(np.allclose(xf[:, 0:rowsize//2+1], xf_gpu, atol=1e-6))
 
     def test_against_fft_3d(self):
+
         from pyculib.fft.binding import Plan, CUFFT_R2C
         depth = 2
         colsize = 2
