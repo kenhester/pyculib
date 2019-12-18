@@ -4,7 +4,7 @@ from ctypes import c_void_p, c_int, c_int64, c_size_t, c_long, c_longlong, POINT
 from numba import cuda
 
 from numba.cuda.cudadrv.drvapi import cu_stream
-from numba.cuda.cudadrv.driver import device_pointer
+from numba.cuda.cudadrv.driver import device_pointer, device_ctypes_pointer, host_pointer
 from pyculib.utils import Lib, ctype_function, finalizer
 
 STATUS = {
@@ -19,6 +19,8 @@ STATUS = {
     0x8: 'CUFFT_INVALID_SIZE',
     0x9: 'CUFFT_UNALIGNED_DATA',
 }
+
+CUFFT_SUCCESS = 0
 
 cufftResult = c_int
 
@@ -65,7 +67,7 @@ CUFFT_WORKAREA_MINIMAL = 0 # maximum reduction
 CUFFT_WORKAREA_USER = 1 # use workSize parameter as limit
 CUFFT_WORKAREA_PERFORMANCE = 2 # default - 1x overhead or more, maximum performance
 
-#cufftXtWorkAreaPolicy = c_int
+#cufftXtWorkAreaPolicy = c_int 
 
 # cufftXtCopyType specifies the type of copy for cufftXtMemcpy
 CUFFT_COPY_HOST_TO_DEVICE = 0x00
@@ -76,6 +78,7 @@ CUFFT_COPY_UNDEFINED: 0x03
 cufftXtCopyType = c_int
 
 cudaDataType = c_int
+  
 
 class CuFFTError(Exception):
     def __init__(self, code):
@@ -98,8 +101,7 @@ class libcufft(Lib):
                                  POINTER(cufftHandle),  # plan
                                  c_int,  # nx
                                  cufftType,  # type
-                                 c_int,
-                                 # batch - deprecated - use cufftPlanMany
+                                 c_int, # batch - deprecated - use cufftPlanMany
     )
 
     cufftPlan2d = ctype_function(cufftResult,
@@ -122,7 +124,37 @@ class libcufft(Lib):
     cufftCreate = ctype_function(cufftResult,
                                   POINTER(cufftHandle),  # plan
     )
-   
+
+    #cufftResult  cufftMakePlan1d(cufftHandle plan, int nx, cufftType type, int batch, 
+    #    size_t *workSize);
+    cufftMakePlan1d = ctype_function(cufftResult,
+                                 cufftHandle,  # plan
+                                 c_int,  # nx
+                                 cufftType,  # type
+                                 c_int, # batch
+                                 c_void_p, #POINTER(c_size_t) workSize
+    )
+    
+    
+    #cufftResult cufftMakePlan2d(cufftHandle plan, int nx, int ny, cufftType type, 
+    #    size_t *workSize);
+    cufftMakePlan2d = ctype_function(cufftResult,
+                                 cufftHandle,  # plan
+                                 c_int,  # nx
+                                 c_int,  # ny
+                                 cufftType,  # type
+                                 c_void_p, #POINTER(c_size_t) workSize
+    )    
+    #cufftResult cufftMakePlan3d(cufftHandle plan, int nx, int ny, int nz, cufftType type,
+    #    size_t *workSize);
+    cufftMakePlan3d = ctype_function(cufftResult,
+                                 cufftHandle,  # plan
+                                 c_int,  # nx
+                                 c_int,  # ny
+                                 c_int,  # nz
+                                 cufftType,  # type
+                                 c_void_p, #POINTER(c_size_t) workSize
+    )                   
     #cufftResult CUFFTAPI cufftMakePlanMany(cufftHandle plan,
     #                                       int rank,
     #                                       int *n,
@@ -162,7 +194,7 @@ class libcufft(Lib):
                                  c_int,  # rank
                                  c_void_p, #POINTER(c_longlong) n
                                  c_void_p, #POINTER(c_longlong) inembed
-                                 c_longlong,  # inembed
+                                 c_longlong,  # istride
                                  c_longlong,  # idist
                                  c_void_p, #POINTER(c_longlong) onembed
                                  c_longlong,  # ostride
@@ -237,11 +269,11 @@ class libcufft(Lib):
                                     cu_stream,  # stream
     )
 
-    cufftSetCompatibilityMode = ctype_function(cufftResult,
-                                               cufftHandle,  # plan,
-                                               cufftCompatibility  # mode
-    )
-
+    #MIN_CUDA_VERSION <= 900
+    #cufftSetCompatibilityMode = ctype_function(cufftResult,cufftHandle,  # plan, 
+    #                                            cufftCompatibility  # mode
+    #)
+        
     # multi-GPU routines
     
     #cufftResult CUFFTAPI cufftXtSetGPUs(cufftHandle handle, int nGPUs, int *whichGPUs);
@@ -256,7 +288,7 @@ class libcufft(Lib):
     #                                   cufftXtSubFormat format);
     cufftXtMalloc = ctype_function(cufftResult,
                                                cufftHandle,  # plan,
-                                               c_void_p, #POINTER(c_void_p) descriptor
+                                               POINTER(c_void_p), # descriptor
                                                cufftXtSubFormat #format
     )
     
@@ -449,7 +481,6 @@ class PlanDataHelper(finalizer.OwnerMixin) :
     def __del__(self):
       if self._ngpu > 1 :
        # if self._d_data != c_void_p(0) :
-           print('\nPlanDataHelper.cufftXtFree API')
            self._api.cufftXtFree(self._d_data)
            self._d_data = c_void_p(0)
 
@@ -467,9 +498,9 @@ class PlanDataHelper(finalizer.OwnerMixin) :
           inst._d_data = c_void_p(0)
           if stream != None : 
               inst._api.cufftSetStream(plan._handle, stream.handle)
-          
-          inst._api.cufftXtMalloc(plan._handle, byref(inst._d_data), CUFFT_XT_FORMAT_INPLACE)
-          inst._api.cufftXtMemcpy(plan._handle, inst._d_data, data.ctypes.data, CUFFT_COPY_HOST_TO_DEVICE)
+              
+          inst._api.cufftXtMalloc(plan._handle, byref(inst._d_data), CUFFT_XT_FORMAT_INPLACE) #CUFFT_XT_FORMAT_INPUT 
+          inst._api.cufftXtMemcpy(plan._handle, inst._d_data, data.ctypes.data, CUFFT_COPY_HOST_TO_DEVICE) 
 
         return inst; 
 
@@ -478,10 +509,8 @@ class PlanDataHelper(finalizer.OwnerMixin) :
         if self._ngpu <= 1 :
           self._d_data.copy_to_host(data)
         else :
-          print('\n[start] copy_to_host.cufftXtMemcpy Xt API ')
-          self._api.cufftXtMemcpy(self._plan._handle, data.ctypes.data, self._d_data,
-                 CUFFT_COPY_DEVICE_TO_HOST) 
-          print('\n[End] copy_to_host.cufftXtMemcpy Xt API ')
+          self._api.cufftXtMemcpy(self._plan._handle, data.ctypes.data, self._d_data, CUFFT_COPY_DEVICE_TO_HOST) 
+
 
 class Plan(finalizer.OwnerMixin):
     @classmethod
@@ -491,11 +520,12 @@ class Plan(finalizer.OwnerMixin):
         inst._api = libcufft()
         inst._handle = cufftHandle()
         inst._ngpu = 1
+        inst._dtype = dtype
         
         BATCH = 1  # deprecated args to cufftPlan1d
-        inst._api.cufftPlan1d(byref(inst._handle), int(nx), int(dtype), BATCH)
-        inst.dtype = dtype
+        inst._api.cufftPlan1d(byref(inst._handle), int(nx), int(dtype), BATCH) 
         inst._finalizer_track((inst._handle, inst._api))
+           
         return inst
 
     @classmethod
@@ -505,11 +535,11 @@ class Plan(finalizer.OwnerMixin):
         inst._api = libcufft()
         inst._handle = cufftHandle()
         inst._ngpu = 1
+        inst._dtype = dtype
 
-        inst._api.cufftPlan2d(byref(inst._handle), int(nx), int(ny),
-                              int(dtype))
-        inst.dtype = dtype
+        inst._api.cufftPlan2d(byref(inst._handle), int(nx), int(ny), int(dtype)) 
         inst._finalizer_track((inst._handle, inst._api))
+         
         return inst
 
     @classmethod
@@ -519,10 +549,9 @@ class Plan(finalizer.OwnerMixin):
         inst._api = libcufft()
         inst._handle = cufftHandle()
         inst._ngpu = 1
+        inst._dtype = dtype
 
-        inst._api.cufftPlan3d(byref(inst._handle), int(nx), int(ny),
-                          int(nz), int(dtype))
-        inst.dtype = dtype
+        inst._api.cufftPlan3d(byref(inst._handle), int(nx), int(ny), int(nz), int(dtype)) 
         inst._finalizer_track((inst._handle, inst._api))
         return inst
 
@@ -533,6 +562,7 @@ class Plan(finalizer.OwnerMixin):
         inst._api = libcufft()
         inst._handle = cufftHandle()
         inst._ngpu = ngpu
+        inst._dtype = dtype
 
         if ngpu <= 1 :
             c_shape_1 = np.asarray(shape, dtype=np.int32)
@@ -541,16 +571,18 @@ class Plan(finalizer.OwnerMixin):
                                 c_shape_1.ctypes.data,
                                 None, 1, 0,
                                 None, 1, 0,
-                                int(dtype), int(batch))
+                                int(dtype), int(batch)) 
+            #if len(c_shape_1) == 1 :
+            #    inst._api.cufftPlan1d(byref(inst._handle), c_shape_1[0], dtype, batch) 
+            #elif len(c_shape_1) == 2 :
+            #    inst._api.cufftPlan2d(byref(inst._handle), c_shape_1[0], c_shape_1[1], dtype)    
+            #elif len(c_shape_1) == 3 :
+            #    inst._api.cufftPlan3d(byref(inst._handle), c_shape_1[0], c_shape_1[1], c_shape_1[2], dtype)                                    
         else :
-            c_shape = np.asarray(shape, dtype=np.long)
-            
-            workSize = []
-            for i in range(ngpu) :
-                workSize.append(0)
-            c_workSize = np.asarray(workSize, dtype=np.int64)
+            c_shape = np.asarray(shape, dtype=np.longlong)
+            c_workSize = np.zeros(ngpu, dtype=np.uint)
 
-            size=np.int64(1)
+            size=np.longlong(1)
             for element in c_shape:
                 size=size*element
 
@@ -559,37 +591,44 @@ class Plan(finalizer.OwnerMixin):
                 gpuid_list.append(i)  
             gpuids = np.asarray(gpuid_list, dtype=np.int32)
                 
-            inst._api.cufftCreate(byref(inst._handle) )
-            inst._api.cufftXtSetGPUs(inst._handle, ngpu, gpuids.ctypes.data) 
+            inst._api.cufftCreate(byref(inst._handle) ) 
+            inst._api.cufftXtSetGPUs(inst._handle, c_int(ngpu), gpuids.ctypes.data) 
             inst._api.cufftMakePlanMany64(inst._handle,
-                                len(shape),
+                                len(c_shape),
                                 c_shape.ctypes.data,
-                                None, 1, size,
-                                None, 1, size,
-                                int(dtype), int(batch), c_workSize.ctypes.data)
-                                           
-        inst.shape = shape
-        inst.dtype = dtype
-        inst.batch = batch
+                                None, 1, 0,
+                                None, 1, 0,
+                                dtype, c_longlong(batch), c_workSize.ctypes.data) 
+            #if len(c_shape) == 1 :
+            #    inst._api.cufftMakePlan1d(inst._handle, c_shape[0], dtype, batch, c_workSize.ctypes.data) 
+            #elif len(c_shape) == 2 :
+            #    inst._api.cufftMakePlan2d(inst._handle, c_shape[0], c_shape[1], dtype, c_workSize.ctypes.data)    
+            #elif len(c_shape) == 3 :
+            #    inst._api.cufftMakePlan3d(inst._handle, c_shape[0], c_shape[1], c_shape[2], dtype, c_workSize.ctypes.data)                                    
+
         inst._finalizer_track((inst._handle, inst._api))
+      
         return inst
 
     @classmethod
     def _finalize(cls, res):
         handle, api = res
-        api.cufftDestroy(handle)
+        if not handle is None : 
+            api.cufftDestroy(handle)
+            handle = None                                  
 
     def set_stream(self, stream):
         "Associate a CUDA stream to this plan object"
-        return self._api.cufftSetStream(self._handle, stream.handle)
+        return self._api.cufftSetStream(self._handle, stream.handle) 
 
     def to_device(self, data, stream=None):
         "copy host memory to device"
         return PlanDataHelper.to_device(self, data, stream)
-
         
     def set_compatibility_mode(self, mode):
-        return self._api.cufftSetCompatibilityMode(self._handle, mode)
+        #MIN_CUDA_VERSION <= 900
+        #return self._api.cufftSetCompatibilityMode(self._handle, mode) 
+        return True
 
     def set_native_mode(self):
         return self.set_compatibility_mode(CUFFT_COMPATIBILITY_NATIVE)
@@ -604,21 +643,23 @@ class Plan(finalizer.OwnerMixin):
         return self.set_compatibility_mode(CUFFT_COMPATIBILITY_FFTW_ALL)
 
     def exe(self, idata, odata, dir):
-        postfix = cufft_dtype_to_name[self.dtype]
+        postfix = cufft_dtype_to_name[self._dtype]
+        handle = self._handle
+            
         if self._ngpu <= 1 :
           meth = getattr(self._api, 'cufftExec' + postfix)
           if isinstance(idata,PlanDataHelper) :
-              return meth(self._handle, device_pointer(idata._d_data), device_pointer(odata._d_data), 
-                        int(dir))
+              return meth(handle, device_pointer(idata._d_data), device_pointer(odata._d_data), 
+                        int(dir)) 
           else :      
-              return meth(self._handle, device_pointer(idata), device_pointer(odata), 
-                        int(dir))
+              return meth(handle, device_pointer(idata), device_pointer(odata), 
+                        int(dir)) 
                         
         meth = getattr(self._api, 'cufftXtExecDescriptor' + postfix)
         if postfix == 'C2C' or postfix == 'Z2Z':
-            return meth(self._handle, idata._d_data, odata._d_data, int(dir))
+            return meth(handle, idata._d_data, odata._d_data, int(dir)) 
         
-        return meth(self._handle, idata._d_data, odata._d_data)
+        return meth(handle, idata._d_data, odata._d_data) 
 
 
     def forward(self, idata, odata):
